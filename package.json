@@ -60,5 +60,8 @@
         "TextTrackType.js",
         "VideoResizeMode.js",
         "react-native-video.podspec"
-    ]
+    ],
+    "publishConfig": {
+        "registry": "https://repo.eachscape.net/repository/npm-internal"
+    }    
 }

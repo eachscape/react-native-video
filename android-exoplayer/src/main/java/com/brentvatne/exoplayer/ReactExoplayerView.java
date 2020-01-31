@@ -70,6 +70,8 @@ import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.lang.Math;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Map;
 import java.lang.Object;
 import java.util.ArrayList;
@@ -788,6 +790,7 @@ class ReactExoplayerView extends FrameLayout implements
     public void onPlayerError(ExoPlaybackException e) {
         String errorString = null;
         Exception ex = e;
+        boolean isBehindLiveWindow = false;
         if (e.type == ExoPlaybackException.TYPE_RENDERER) {
             Exception cause = e.getRendererException();
             if (cause instanceof MediaCodecRenderer.DecoderInitializationException) {
@@ -812,18 +815,34 @@ class ReactExoplayerView extends FrameLayout implements
         }
         else if (e.type == ExoPlaybackException.TYPE_SOURCE) {
             ex = e.getSourceException();
-            errorString = getResources().getString(R.string.unrecognized_media_format);
+            if (isBehindLiveWindow(e)) {
+                errorString = null;
+                isBehindLiveWindow = true;
+//                Log.e("ReactExoplayerView", "Behind Live Window");
+            }
+            else {
+                errorString = getResources().getString(R.string.unrecognized_media_format);
+            }
+        } else if (e.type == ExoPlaybackException.TYPE_UNEXPECTED) {
+            if(isArrayIndexOutOfBoundsException(e)) {
+                errorString = "ArrayIndexOutOfBoundsException restart videoPlayer";
+                eventEmitter.error(errorString, e);
+                clearResumePosition();
+                initializePlayer();
+                return;
+            }
         }
         if (errorString != null) {
             eventEmitter.error(errorString, ex);
         }
         playerNeedsSource = true;
-        if (isBehindLiveWindow(e)) {
+        if (isBehindLiveWindow) {
             clearResumePosition();
             initializePlayer();
         } else {
             updateResumePosition();
         }
+
     }
 
     private static boolean isBehindLiveWindow(ExoPlaybackException e) {
@@ -833,6 +852,20 @@ class ReactExoplayerView extends FrameLayout implements
         Throwable cause = e.getSourceException();
         while (cause != null) {
             if (cause instanceof BehindLiveWindowException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
+    }
+
+    private static boolean isArrayIndexOutOfBoundsException(ExoPlaybackException e) {
+        if (e.type != ExoPlaybackException.TYPE_UNEXPECTED) {
+            return false;
+        }
+        Throwable cause = e.getUnexpectedException();
+        while (cause != null) {
+            if (cause instanceof ArrayIndexOutOfBoundsException) {
                 return true;
             }
             cause = cause.getCause();
